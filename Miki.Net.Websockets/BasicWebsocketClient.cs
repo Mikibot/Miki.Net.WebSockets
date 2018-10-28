@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Net.WebSockets;
 using System.Threading;
 using System.Runtime.InteropServices;
+using Miki.Logging;
 
 namespace Miki.Net.WebSockets
 {
@@ -24,7 +25,7 @@ namespace Miki.Net.WebSockets
 				Console.WriteLine(_wsClient.CloseStatusDescription);
 			}
 
-			await _wsClient.CloseAsync(WebSocketCloseStatus.Empty, "", token);
+			await _wsClient.CloseAsync(WebSocketCloseStatus.NormalClosure, string.Empty, token);
 		}
 
 		public async Task ConnectAsync(Uri connectionUri, CancellationToken token)
@@ -49,24 +50,19 @@ namespace Miki.Net.WebSockets
 				throw new ArgumentException("could not get ArraySegment from Memory");
 			}
 
-			await _wsClient.SendAsync(segment, (WebSocketMessageType)data.ContentType, false, token);
+			await _wsClient.SendAsync(segment, (WebSocketMessageType)data.ContentType, true, token);
 		}
 
-		public async Task<WebSocketResponse> ReceiveAsync(Memory<byte> data, CancellationToken token)
+		public async Task<WebSocketResponse> ReceiveAsync(ArraySegment<byte> data, CancellationToken token)
 		{
-			if (_wsClient.CloseStatus.HasValue)
+			var response = await _wsClient.ReceiveAsync(data, token);
+
+			if (_wsClient.State == WebSocketState.Closed || _wsClient.CloseStatus.HasValue)
 			{
-				Console.WriteLine(_wsClient.CloseStatusDescription);
+				Log.Warning($"Websocket closed with message: {_wsClient.CloseStatus.ToString()}: {_wsClient.CloseStatusDescription}.");
+
+				await CloseAsync(token);
 			}
-
-			if (!MemoryMarshal.TryGetArray<byte>(data, out var segment))
-			{
-				throw new ArgumentException("could not get ArraySegment from Memory");
-			}
-
-			var response = await _wsClient.ReceiveAsync(segment, token);
-
-			data = segment;
 
 			return new WebSocketResponse
 			{

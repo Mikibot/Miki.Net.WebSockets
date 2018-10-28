@@ -14,6 +14,6 @@ namespace Miki.Net.WebSockets
 
 		Task SendAsync(WebSocketContent data, CancellationToken token);
 
-		Task<WebSocketResponse> ReceiveAsync(Memory<byte> data, CancellationToken token);
+		Task<WebSocketResponse> ReceiveAsync(ArraySegment<byte> data, CancellationToken token);
 	}
 }
