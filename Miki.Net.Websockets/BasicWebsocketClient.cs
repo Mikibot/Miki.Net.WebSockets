@@ -6,6 +6,7 @@ using System.Net.WebSockets;
 using System.Threading;
 using System.Runtime.InteropServices;
 using Miki.Logging;
+using Miki.Net.WebSockets.Exceptions;
 
 namespace Miki.Net.WebSockets
 {
@@ -13,37 +14,39 @@ namespace Miki.Net.WebSockets
 	{
 		ClientWebSocket _wsClient;
 
-		public BasicWebSocketClient()
-		{
-			_wsClient = new ClientWebSocket();
-		}
+        public bool IsValid {
+            get
+            {
+                if (_wsClient == null)
+                {
+                    return false;
+                }
+                return _wsClient.State == WebSocketState.Open;
+            }
+        }
 
 		public async Task CloseAsync(CancellationToken token)
 		{
-			if (_wsClient.CloseStatus.HasValue)
-			{
-				Console.WriteLine(_wsClient.CloseStatusDescription);
-			}
-
-			await _wsClient.CloseAsync(WebSocketCloseStatus.NormalClosure, string.Empty, token);
+            if (IsValid)
+            {
+                _wsClient.Abort();
+                await _wsClient.CloseAsync(WebSocketCloseStatus.NormalClosure, string.Empty, token);
+            }
+            _wsClient = null;
 		}
 
 		public async Task ConnectAsync(Uri connectionUri, CancellationToken token)
 		{
-			if (_wsClient.CloseStatus.HasValue)
-			{
-				Console.WriteLine(_wsClient.CloseStatusDescription);
-			}
-
-			await _wsClient.ConnectAsync(connectionUri, token);
+            _wsClient = new ClientWebSocket();
+			await _wsClient.ConnectAsync(connectionUri, token);        
 		}
 
 		public async Task SendAsync(WebSocketContent data, CancellationToken token)
 		{
-			if (_wsClient.CloseStatus.HasValue)
-			{
-				Console.WriteLine(_wsClient.CloseStatusDescription);
-			}
+            if(!IsValid)
+            {
+                return;
+            }
 
 			if (!MemoryMarshal.TryGetArray<byte>(data, out var segment))
 			{
@@ -55,16 +58,26 @@ namespace Miki.Net.WebSockets
 
 		public async Task<WebSocketResponse> ReceiveAsync(ArraySegment<byte> data, CancellationToken token)
 		{
+            if(!IsValid)
+            {
+                return new WebSocketResponse
+                {
+                    CloseReason = null,
+                    Count = 0,
+                    EndOfMessage = true,
+                    HasClosed = true,
+                    MessageType = WebSocketContentType.Close
+                };
+            }
+
 			var response = await _wsClient.ReceiveAsync(data, token);
 
 			if (_wsClient.State == WebSocketState.Closed || _wsClient.CloseStatus.HasValue)
 			{
-				Log.Warning($"Websocket closed with message: {_wsClient.CloseStatus.ToString()}: {_wsClient.CloseStatusDescription}.");
+                throw new WebSocketCloseException((int)_wsClient.CloseStatus.Value, _wsClient.CloseStatusDescription);
+            }
 
-				await CloseAsync(token);
-			}
-
-			return new WebSocketResponse
+            return new WebSocketResponse
 			{
 				CloseReason = response.CloseStatusDescription,
 				Count = response.Count,

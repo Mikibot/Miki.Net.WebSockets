@@ -8,6 +8,8 @@ namespace Miki.Net.WebSockets
 {
     public interface IWebSocketClient
 	{
+        bool IsValid { get; }
+
 		Task ConnectAsync(Uri connectionUri, CancellationToken token);
 
 		Task CloseAsync(CancellationToken token);
