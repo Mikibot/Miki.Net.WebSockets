@@ -6,11 +6,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Miki.Logging" Version="1.4.2" />
     <PackageReference Include="System.Memory" Version="4.5.2" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\Miki.Logging\Miki.Logging\Miki.Logging.csproj" />
   </ItemGroup>
 
 </Project>
